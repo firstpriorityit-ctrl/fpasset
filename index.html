@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FirstTrack Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom styles for the signature canvas */
+        canvas {
+            touch-action: none; /* Prevent scrolling while signing */
+            cursor: crosshair;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed top-4 right-4 z-50 transform transition-transform duration-300 translate-x-full">
+        <div id="toast-message" class="bg-blue-600 text-white px-6 py-3 rounded shadow-lg flex items-center gap-2">
+            <i data-lucide="info"></i>
+            <span>Message</span>
+        </div>
+    </div>
+
+    <!-- MAIN APP STRUCTURE -->
+    <div id="app-container" class="flex flex-col min-h-screen">
+        
+        <!-- NAVIGATION -->
+        <nav class="bg-blue-800 text-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="activity" class="text-red-400"></i>
+                        <span class="font-bold text-xl tracking-tight">FirstTrack Pro</span>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="flex items-baseline space-x-4">
+                            <button onclick="nav('dashboard')" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium">Dashboard</button>
+                            <!-- PROMINENT NAVBAR BUTTON -->
+                            <button onclick="nav('checkout')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md text-sm font-bold shadow-lg transform hover:scale-105 transition-all flex items-center gap-2">
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                New Borrow
+                            </button>
+                            <button onclick="nav('audit')" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium">Audit Logs</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div id="connection-status" class="flex items-center gap-1 text-xs text-yellow-300">
+                            <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div> Connecting...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Mobile Menu -->
+            <div class="md:hidden bg-blue-900 flex justify-around py-2">
+                <button onclick="nav('dashboard')" class="text-xs flex flex-col items-center p-2 text-blue-200"><i data-lucide="layout-dashboard"></i>Dash</button>
+                <button onclick="nav('checkout')" class="text-xs flex flex-col items-center p-2 text-white font-bold"><i data-lucide="plus-circle"></i>Borrow</button>
+                <button onclick="nav('audit')" class="text-xs flex flex-col items-center p-2 text-blue-200"><i data-lucide="file-search"></i>Audit</button>
+            </div>
+        </nav>
+
+        <!-- CONTENT AREA -->
+        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            
+            <!-- DASHBOARD VIEW -->
+            <div id="view-dashboard" class="view-section fade-in">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+                        <h3 class="text-gray-500 text-sm font-medium uppercase">Active Borrows</h3>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="stat-active">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+                        <h3 class="text-gray-500 text-sm font-medium uppercase">Returned Today</h3>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="stat-returned">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+                        <h3 class="text-gray-500 text-sm font-medium uppercase">Total Assets Tracked</h3>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="stat-total">--</p>
+                    </div>
+                </div>
+
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="clipboard-list"></i> Outstanding Assets
+                </h2>
+                
+                <div id="active-assets-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Populated by JS -->
+                    <div class="col-span-full text-center py-8 text-gray-500">Loading data...</div>
+                </div>
+                
+                <div id="empty-state" class="hidden text-center py-12 bg-white rounded-lg shadow-sm border border-dashed border-gray-300">
+                    <i data-lucide="check-circle" class="w-12 h-12 text-green-500 mx-auto mb-3"></i>
+                    <h3 class="text-lg font-medium text-gray-900">All Clear</h3>
+                    <p class="text-gray-500">No assets are currently borrowed.</p>
+                </div>
+            </div>
+
+            <!-- CHECKOUT VIEW -->
+            <div id="view-checkout" class="view-section hidden fade-in">
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden max-w-2xl mx-auto">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800">Borrow Asset(s)</h2>
+                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">New Entry</span>
+                    </div>
+                    <form id="checkout-form" class="p-6 space-y-4">
+                        
+                        <!-- Recorded By Field -->
+                        <div class="bg-blue-50 p-4 rounded-md border border-blue-100 mb-4">
+                            <label class="block text-sm font-bold text-blue-800">Recorded By (Your Name/ID)</label>
+                            <input type="text" id="input-recorded-by" class="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Call Number / Incident #</label>
+                                <input type="text" id="input-call" class="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="e.g. 23-44091" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sending Facility</label>
+                                <select id="input-facility" onchange="toggleOtherFacility()" class="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                                    <option value="">Select Facility...</option>
+                                    <option value="Lexington Medical Center">Lexington Medical Center</option>
+                                    <option value="MUSC Downtown">MUSC Downtown</option>
+                                    <option value="MUSC Northeast">MUSC Northeast</option>
+                                    <option value="MUSC Fairfield">MUSC Fairfield</option>
+                                    <option value="MUSC Kershaw">MUSC Kershaw</option>
+                                    <option value="Other">Other (Specify)</option>
+                                </select>
+                                <input type="text" id="input-facility-other" class="mt-2 hidden w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter Facility Name">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Crew Member(s)</label>
+                            <input type="text" id="input-crew" class="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="e.g. Smith, Jones" required>
+                        </div>
+
+                        <div class="border-t border-gray-100 pt-4 mt-4">
+                            <h3 class="text-sm font-semibold text-gray-500 mb-3">Asset Details</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Asset Type</label>
+                                    <select id="input-type" onchange="toggleOtherType()" class="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="IV Pump">IV Pump</option>
+                                        <option value="Other">Other (Specify)</option>
+                                    </select>
+                                    <input type="text" id="input-type-other" class="mt-2 hidden w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter Asset Description">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Serial Numbers / Asset Tags</label>
+                                    <p class="text-xs text-gray-500 mb-1">Scan or type one per line for multiple items.</p>
+                                    <textarea id="input-serials" rows="4" class="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono text-sm" placeholder="Scan Barcode A&#10;Scan Barcode B&#10;Scan Barcode C" required></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 flex gap-3">
+                            <button type="button" onclick="nav('dashboard')" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition">Cancel</button>
+                            <button type="submit" id="btn-submit-borrow" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition shadow-md">Confirm Borrow</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- AUDIT VIEW -->
+            <div id="view-audit" class="view-section hidden fade-in">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                        <h2 class="text-lg font-bold text-gray-800">Audit Log</h2>
+                        <div class="relative">
+                            <input type="text" id="audit-search" onkeyup="renderAuditTable()" placeholder="Search logs..." class="pl-9 pr-4 py-2 border rounded-full text-sm w-full md:w-64 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call / Facility</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Checkout</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- RETURN MODAL (Overlay) -->
+    <div id="return-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg fade-in" style="max-height:90vh; overflow-y:auto;">
+            <div class="bg-blue-800 text-white px-6 py-4 rounded-t-lg flex justify-between items-center sticky top-0">
+                <h3 class="font-bold text-lg">Return Asset</h3>
+                <button onclick="closeReturnModal()" class="hover:text-red-300"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div class="bg-gray-50 p-3 rounded border text-sm">
+                    <p><strong>Item:</strong> <span id="modal-asset-name"></span></p>
+                    <p><strong>Serial:</strong> <span id="modal-asset-serial"></span></p>
+                    <p><strong>Checkout Date:</strong> <span id="modal-checkout-date"></span></p>
+                </div>
+
+                <!-- Names -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Returning Crew Member (Name)</label>
+                        <input type="text" id="return-crew" class="mt-1 block w-full rounded border-gray-300 border p-2 shadow-sm outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g. Paramedic Smith" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Authorized Receiving Agent (Name)</label>
+                        <input type="text" id="return-recorded-by" class="mt-1 block w-full rounded border-gray-300 border p-2 shadow-sm outline-none focus:ring-1 focus:ring-blue-500" placeholder="e.g. Nurse Jones / Agent" required>
+                    </div>
+                </div>
+
+                <!-- Signatures -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Signature: Returning Crew</label>
+                    <div class="border-2 border-dashed border-gray-300 rounded bg-white relative">
+                        <canvas id="sig-crew" class="w-full h-32 block"></canvas>
+                        <div class="absolute bottom-1 right-2 text-xs text-gray-400 pointer-events-none">Sign Here (Crew)</div>
+                    </div>
+                    <button type="button" onclick="clearCanvas('sig-crew')" class="text-xs text-red-600 hover:text-red-800 mt-1">Clear</button>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Signature: Authorized Receiving Agent</label>
+                    <div class="border-2 border-dashed border-gray-300 rounded bg-white relative">
+                        <canvas id="sig-receiver" class="w-full h-32 block"></canvas>
+                        <div class="absolute bottom-1 right-2 text-xs text-gray-400 pointer-events-none">Sign Here (Agent)</div>
+                    </div>
+                    <button type="button" onclick="clearCanvas('sig-receiver')" class="text-xs text-red-600 hover:text-red-800 mt-1">Clear</button>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button onclick="closeReturnModal()" class="flex-1 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50">Cancel</button>
+                    <button onclick="processReturn()" id="btn-submit-return" class="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 shadow">Confirm Return</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // ==========================================
+        // PASTE YOUR NEW FIREBASE CONFIG HERE
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAaQEnNCa5zQy_0y_EM30su_j6H-PRjOV0",
+            authDomain: "fpasset-cdf57.firebaseapp.com",
+            projectId: "fpasset-cdf57",
+            storageBucket: "fpasset-cdf57.firebasestorage.app",
+            messagingSenderId: "645665313356",
+            appId: "1:645665313356:web:62b160c59748afac3b1ae9",
+            measurementId: "G-9EX4M61VKF"
+        };
+
+        // --- FIREBASE INIT ---
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            const analytics = getAnalytics(app);
+            db = getFirestore(app);
+            initRealtimeListener();
+        } catch(e) {
+            console.error("Firebase Init Error", e);
+            document.getElementById('connection-status').innerHTML = '<span class="text-red-400 font-bold">Init Error</span>';
+        }
+
+        // --- STATE & DATA ---
+        let localAssets = []; 
+
+        function initRealtimeListener() {
+            if(!db) return;
+            const q = query(collection(db, "ems_assets"), orderBy("checkoutTime", "desc"));
+            
+            onSnapshot(q, (snapshot) => {
+                localAssets = [];
+                snapshot.forEach((doc) => {
+                    localAssets.push({ ...doc.data(), id: doc.id });
+                });
+                
+                updateDashboard();
+                renderAuditTable();
+                
+                document.getElementById('connection-status').innerHTML = '<div class="w-2 h-2 bg-green-400 rounded-full"></div> Live';
+            }, (error) => {
+                console.error("Data fetch error:", error);
+                
+                let errorMsg = "Offline";
+                if(error.code === 'permission-denied') {
+                    errorMsg = "Perms Denied (Check Rules)";
+                    alert("DATABASE RULES ERROR:\n\nYou are connected to Firebase, but permission was denied. \n\nFIX: Go to Firebase Console > Firestore Database > Rules and ensure they are set to allow read/write (Test Mode).");
+                }
+                
+                document.getElementById('connection-status').innerHTML = `<span class="text-red-400 font-bold text-xs">${errorMsg}</span>`;
+            });
+        }
+
+        // --- EXPOSE FUNCTIONS ---
+        window.nav = function(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(`view-${viewName}`);
+            if (target) {
+                target.classList.remove('hidden');
+                if (viewName === 'dashboard') updateDashboard();
+                if (viewName === 'audit') renderAuditTable();
+            }
+        }
+
+        window.toggleOtherFacility = function() {
+            const select = document.getElementById('input-facility');
+            const otherInput = document.getElementById('input-facility-other');
+            if (select.value === 'Other') {
+                otherInput.classList.remove('hidden');
+                otherInput.required = true;
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.required = false;
+                otherInput.value = '';
+            }
+        }
+
+        window.toggleOtherType = function() {
+            const select = document.getElementById('input-type');
+            const otherInput = document.getElementById('input-type-other');
+            if (select.value === 'Other') {
+                otherInput.classList.remove('hidden');
+                otherInput.required = true;
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.required = false;
+                otherInput.value = '';
+            }
+        }
+
+        // --- DASHBOARD ---
+        function updateDashboard() {
+            const active = localAssets.filter(a => a.status === 'active');
+            const returned = localAssets.filter(a => a.status === 'returned');
+            
+            document.getElementById('stat-active').textContent = active.length;
+            document.getElementById('stat-total').textContent = localAssets.length;
+            
+            const today = new Date().toDateString();
+            const returnedToday = returned.filter(a => a.returnTime && new Date(a.returnTime).toDateString() === today).length;
+            document.getElementById('stat-returned').textContent = returnedToday;
+
+            const listContainer = document.getElementById('active-assets-list');
+            listContainer.innerHTML = '';
+
+            if (active.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+            } else {
+                document.getElementById('empty-state').classList.add('hidden');
+                active.forEach(asset => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white border rounded-lg shadow-sm hover:shadow-md transition p-5 flex flex-col justify-between';
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">${asset.type}</span>
+                                <span class="text-gray-400 text-xs">${new Date(asset.checkoutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-gray-800">${asset.serial}</h4>
+                            <p class="text-sm text-gray-600 mb-1"><span class="font-semibold">Call:</span> ${asset.callNumber}</p>
+                            <p class="text-sm text-gray-600 mb-1"><span class="font-semibold">Loc:</span> ${asset.facility}</p>
+                            <p class="text-sm text-gray-500 mb-4 truncate"><i data-lucide="users" class="w-3 h-3 inline"></i> ${asset.crew}</p>
+                        </div>
+                        <button onclick="openReturnModal('${asset.id}')" class="w-full mt-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-medium py-2 rounded flex items-center justify-center gap-2 transition">
+                            <span>Return Asset</span>
+                        </button>
+                    `;
+                    listContainer.appendChild(card);
+                });
+                lucide.createIcons();
+            }
+        }
+
+        // --- CHECKOUT SUBMISSION ---
+        document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit-borrow');
+            btn.disabled = true;
+            btn.textContent = "Processing...";
+            
+            try {
+                if(!db) throw new Error("Database not connected. Please add config.");
+                const facilitySelect = document.getElementById('input-facility').value;
+                const facilityOther = document.getElementById('input-facility-other').value;
+                const finalFacility = facilitySelect === 'Other' ? facilityOther : facilitySelect;
+
+                const typeSelect = document.getElementById('input-type').value;
+                const typeOther = document.getElementById('input-type-other').value;
+                const finalType = typeSelect === 'Other' ? typeOther : typeSelect;
+
+                const serialsText = document.getElementById('input-serials').value;
+                const serials = serialsText.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+
+                if (serials.length === 0) {
+                    throw new Error("Please enter at least one serial number.");
+                }
+
+                const checkoutTime = new Date().toISOString();
+                const checkoutUser = document.getElementById('input-recorded-by').value || 'Anonymous';
+                const callNum = document.getElementById('input-call').value;
+                const crew = document.getElementById('input-crew').value;
+
+                // Add to Firestore loop
+                const promises = serials.map(serial => {
+                    return addDoc(collection(db, "ems_assets"), {
+                        callNumber: callNum,
+                        facility: finalFacility,
+                        crew: crew,
+                        type: finalType,
+                        serial: serial,
+                        checkoutTime: checkoutTime,
+                        checkoutUser: checkoutUser,
+                        status: 'active',
+                        returnTime: null,
+                        returnSignature: null, // Legacy/Receiver
+                        crewReturnSignature: null, // New
+                        returnUser: null,
+                        returnCrew: null
+                    });
+                });
+
+                await Promise.all(promises);
+
+                e.target.reset();
+                window.toggleOtherFacility();
+                window.toggleOtherType();
+                showToast(`${serials.length} asset(s) uploaded successfully`);
+                window.nav('dashboard');
+
+            } catch (err) {
+                alert("Error saving: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Confirm Borrow";
+            }
+        });
+
+        // --- SIGNATURE LOGIC (GENERIC) ---
+        let isDrawing = false;
+        let activeCanvas = null;
+        let activeCtx = null;
+
+        function initCanvas(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Resize logic
+            const resize = () => {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#000';
+            };
+            // Initial resize
+            setTimeout(resize, 100);
+
+            // Drawing handlers
+            const start = (e) => {
+                isDrawing = true;
+                activeCanvas = canvas;
+                activeCtx = ctx;
+                const pos = getPos(e, canvas);
+                ctx.moveTo(pos.x, pos.y);
+                ctx.beginPath();
+            };
+            
+            const move = (e) => {
+                if(isDrawing && activeCanvas === canvas) {
+                    e.preventDefault();
+                    const pos = getPos(e, canvas);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                }
+            };
+
+            const end = () => { isDrawing = false; activeCtx.beginPath(); };
+
+            // Listeners
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            canvas.addEventListener('mouseup', end);
+            canvas.addEventListener('mouseout', end);
+            
+            canvas.addEventListener('touchstart', start);
+            canvas.addEventListener('touchmove', move);
+            canvas.addEventListener('touchend', end);
+        }
+
+        function getPos(e, canvas) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            
+            if(e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        window.clearCanvas = function(id) {
+            const cvs = document.getElementById(id);
+            const cx = cvs.getContext('2d');
+            cx.clearRect(0, 0, cvs.width, cvs.height);
+        }
+
+        function isCanvasBlank(id) {
+            const cvs = document.getElementById(id);
+            const blank = document.createElement('canvas');
+            blank.width = cvs.width; 
+            blank.height = cvs.height;
+            return cvs.toDataURL() === blank.toDataURL();
+        }
+
+        // --- RETURN MODAL ---
+        let currentReturnId = null;
+
+        window.openReturnModal = function(id) {
+            const asset = localAssets.find(a => a.id === id);
+            if (!asset) return;
+
+            currentReturnId = id;
+            document.getElementById('modal-asset-name').textContent = asset.type;
+            document.getElementById('modal-asset-serial').textContent = asset.serial;
+            document.getElementById('modal-checkout-date').textContent = new Date(asset.checkoutTime).toLocaleString();
+            
+            document.getElementById('return-recorded-by').value = '';
+            document.getElementById('return-crew').value = '';
+            
+            window.clearCanvas('sig-crew');
+            window.clearCanvas('sig-receiver');
+            
+            document.getElementById('return-modal').classList.remove('hidden');
+            
+            // Re-init canvases to handle dimension changes in modal
+            initCanvas('sig-crew');
+            initCanvas('sig-receiver');
+        }
+
+        window.closeReturnModal = function() {
+            document.getElementById('return-modal').classList.add('hidden');
+            currentReturnId = null;
+        }
+
+        window.processReturn = async function() {
+            const btn = document.getElementById('btn-submit-return');
+            const returnName = document.getElementById('return-recorded-by').value;
+            const returnCrew = document.getElementById('return-crew').value;
+            
+            if (!returnCrew.trim()) { alert("Please enter the crew member returning the asset."); return; }
+            if (!returnName.trim()) { alert("Please enter who is recording this return."); return; }
+            
+            if (isCanvasBlank('sig-crew')) { alert("Crew signature required."); return; }
+            if (isCanvasBlank('sig-receiver')) { alert("Receiver signature required."); return; }
+
+            btn.disabled = true;
+            btn.textContent = "Saving...";
+
+            try {
+                const assetRef = doc(db, "ems_assets", currentReturnId);
+                await updateDoc(assetRef, {
+                    status: 'returned',
+                    returnTime: new Date().toISOString(),
+                    returnUser: returnName,
+                    returnCrew: returnCrew,
+                    returnSignature: document.getElementById('sig-receiver').toDataURL(), // Receiver
+                    crewReturnSignature: document.getElementById('sig-crew').toDataURL()   // Crew
+                });
+                
+                window.closeReturnModal();
+                showToast('Asset returned successfully');
+            } catch (err) {
+                alert("Error updating return: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Confirm Return";
+            }
+        }
+
+        // --- AUDIT LOG & REPORT ---
+        window.renderAuditTable = function() {
+            const term = (document.getElementById('audit-search').value || '').toLowerCase();
+            const tbody = document.getElementById('audit-table-body');
+            tbody.innerHTML = '';
+
+            const filtered = localAssets.filter(a => 
+                (a.serial || '').toLowerCase().includes(term) || 
+                (a.callNumber || '').toLowerCase().includes(term) ||
+                (a.crew || '').toLowerCase().includes(term)
+            );
+
+            filtered.forEach(asset => {
+                const tr = document.createElement('tr');
+                const isReturned = asset.status === 'returned';
+                
+                let returnInfo = '-';
+                let actionBtn = '';
+                
+                if(isReturned) {
+                    returnInfo = `${new Date(asset.returnTime).toLocaleDateString()}<br>`;
+                    // Updated label in table view as well
+                    returnInfo += `<span class="text-xs text-gray-500">Agent: ${asset.returnUser || 'Unknown'}</span>`;
+                    
+                    actionBtn = `<button onclick="generateReport('${asset.id}')" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200 flex items-center gap-1"><i data-lucide="file-text" class="w-3 h-3"></i> Report</button>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isReturned ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${isReturned ? 'Returned' : 'Active'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${asset.type}</div>
+                        <div class="text-sm text-gray-500">${asset.serial}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${asset.callNumber}</div>
+                        <div class="text-sm text-gray-500">${asset.facility}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${new Date(asset.checkoutTime).toLocaleDateString()}<br>
+                        <span class="text-xs">By: ${asset.checkoutUser || 'Unknown'}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex flex-col gap-2">
+                        <div>${returnInfo}</div>
+                        ${actionBtn}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        window.generateReport = function(id) {
+            const asset = localAssets.find(a => a.id === id);
+            if(!asset) return;
+
+            const printWindow = window.open('', '_blank');
+            const checkoutDate = new Date(asset.checkoutTime).toLocaleString();
+            const returnDate = asset.returnTime ? new Date(asset.returnTime).toLocaleString() : 'N/A';
+            
+            // Handle legacy data where we might only have one signature
+            const receiverSig = asset.returnSignature ? `<img src="${asset.returnSignature}" class="sig-img" />` : 'Not Recorded';
+            const crewSig = asset.crewReturnSignature ? `<img src="${asset.crewReturnSignature}" class="sig-img" />` : 'Not Recorded';
+
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Chain of Custody - ${asset.serial}</title>
+                    <style>
+                        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
+                        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+                        .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+                        .header p { margin: 5px 0 0; color: #666; font-size: 14px; }
+                        
+                        .section { margin-bottom: 30px; border: 1px solid #ddd; border-radius: 4px; padding: 20px; }
+                        .section-title { font-size: 14px; font-weight: bold; text-transform: uppercase; color: #666; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                        
+                        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                        .field { margin-bottom: 10px; }
+                        .label { font-weight: bold; font-size: 12px; color: #888; display: block; margin-bottom: 2px; }
+                        .value { font-size: 16px; }
+
+                        .sig-box { margin-top: 10px; border: 1px dashed #ccc; padding: 10px; text-align: center; height: 120px; display: flex; align-items: center; justify-content: center; background: #fafafa; }
+                        .sig-img { max-height: 100px; max-width: 100%; }
+
+                        .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                        
+                        @media print {
+                            body { padding: 0; }
+                            .section { break-inside: avoid; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Chain of Custody Report</h1>
+                        <p>FirstTrack Pro • EMS Asset Tracking System</p>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">Asset Identification</div>
+                        <div class="grid">
+                            <div class="field"><span class="label">ASSET TYPE</span><span class="value">${asset.type}</span></div>
+                            <div class="field"><span class="label">SERIAL NUMBER / TAG</span><span class="value">${asset.serial}</span></div>
+                            <div class="field"><span class="label">STATUS</span><span class="value" style="color: green; font-weight: bold;">RETURNED / CLOSED</span></div>
+                            <div class="field"><span class="label">RECORD ID</span><span class="value" style="font-family: monospace; font-size: 12px;">${asset.id}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">Borrowing Event (Checkout)</div>
+                        <div class="grid">
+                            <div class="field"><span class="label">DATE & TIME</span><span class="value">${checkoutDate}</span></div>
+                            <div class="field"><span class="label">CALL / INCIDENT #</span><span class="value">${asset.callNumber}</span></div>
+                            <div class="field"><span class="label">FACILITY</span><span class="value">${asset.facility}</span></div>
+                            <div class="field"><span class="label">BORROWING CREW</span><span class="value">${asset.crew}</span></div>
+                            <div class="field"><span class="label">AUTHORIZED BY</span><span class="value">${asset.checkoutUser || 'N/A'}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">Return Event (Hand-off)</div>
+                        <div class="grid">
+                            <div class="field"><span class="label">DATE & TIME</span><span class="value">${returnDate}</span></div>
+                            <div class="field"><span class="label">RETURNING CREW MEMBER</span><span class="value">${asset.returnCrew || 'N/A'}</span></div>
+                            <div class="field"><span class="label">AUTHORIZED RECEIVING AGENT</span><span class="value">${asset.returnUser || 'N/A'}</span></div>
+                        </div>
+                        
+                        <div class="grid" style="margin-top: 20px;">
+                            <div>
+                                <span class="label">SIGNATURE: RETURNING CREW</span>
+                                <div class="sig-box">${crewSig}</div>
+                            </div>
+                            <div>
+                                <span class="label">SIGNATURE: AUTHORIZED RECEIVING AGENT</span>
+                                <div class="sig-box">${receiverSig}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        Generated by FirstTrack Pro on ${new Date().toLocaleString()}
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(html);
+            printWindow.document.close();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.querySelector('#toast span').innerText = msg;
+            toast.classList.remove('translate-x-full');
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+            }, 3000);
+        }
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>
